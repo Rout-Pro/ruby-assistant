@@ -1,0 +1,36 @@
+name: Build Ruby APK
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Download private source archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download v1.0.0-test --pattern Ruby-source.zip
+      - name: Extract and build
+        run: |
+          mkdir source
+          unzip -q ./*Ruby-source.zip -d source
+          cd source
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../Ruby-actions.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Ruby-APK
+          path: Ruby-actions.apk
+      - name: Publish private release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "build-${{ github.run_number }}" Ruby-actions.apk --title "Ruby build ${{ github.run_number }}" --notes "Private debug test APK. Fresh debug signing key; may require uninstalling an older build before installation. See README for scope and test limits."
